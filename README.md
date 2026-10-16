@@ -13,7 +13,7 @@ Play music from folders on your computer in an Obsidian sidebar player, with alb
 - **Resume:** after a restart, the last track is waiting where you left it. Long tracks (over 8 minutes, such as mixes) remember their own position.
 - **Notes:**
   - **Listening log** adds a line such as `- 14:32 ♪ Title — Artist (Album)` to your daily note or to a note of your choice, either when you press the button or automatically for every track you listen to. You can also turn it off. The line format is set in settings.
-  - **Copy embed** gives you a small block to paste into any note. It shows a card with a Play button.
+  - **Add to note** puts a small player card (with a Play button) for the track, album, artist, folder or playlist into the note you're editing.
 - **Two looks:**
   - **Glass:** large covers and soft glows tinted by the album art.
   - **Terminal:** calm monospace text.
@@ -39,12 +39,11 @@ Also works with `track: <file path>`, `artist: <name>`, `playlist: <name>` and `
 
 ## Permissions and privacy
 
-The plugin directory flags two things about Aurora MP3. Here is what each one means:
+The plugin directory flags file system access. Here is what it means:
 
 - **File system access (Node.js `fs`):** this is needed to play music stored outside your vault. Aurora MP3 uses it **read-only**. It lists the music folders you add in settings and reads the audio files in them (tags, covers and playback), plus a `cover.jpg` or `folder.jpg` beside them. It never writes, moves or deletes anything outside your vault. Its own files (`library.json`, `covers/` and `data.json`) are written through Obsidian's normal vault API, in the plugin's folder.
-- **Clipboard:** written to only when you click **Copy embed**, to put the embed block on your clipboard. Aurora MP3 never reads your clipboard.
 
-It makes no network requests and has no telemetry. Nothing leaves your computer.
+It doesn't use the clipboard, makes no network requests and has no telemetry. Nothing leaves your computer.
 
 ## Desktop only
 

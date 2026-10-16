@@ -1,7 +1,7 @@
 /* Aurora MP3: the view. One DOM, two themes (glass, terminal) chosen by a class on the root.
  * mountAmp(root, api) -> { destroy, refresh }
  * api: { player, library, data, save(), coverUrl(name), roots(), openSettings(), rescan(), menu(evt, items),
- *        logTrack(track), logLabel(), copyEmbed(kind, ref), openUrl(url) } */
+ *        logTrack(track), logLabel(), insertEmbed(kind, ref), openUrl(url) } */
 
 const AM_ICONS = {
   play: '<path d="M8 5v14l11-7z" fill="currentColor"/>',
@@ -104,7 +104,7 @@ function mountAmp(root, api) {
 
   const extras = h('div', 'amp-extras', null, scroll);
   const bLog = btn(extras, 'note', '[log]', 'Log', 'amp-small', () => player.current && api.logTrack(player.current));
-  btn(extras, 'embed', '[copy embed]', 'Copy embed for this track', 'amp-small', () => player.current && api.copyEmbed('track', player.current));
+  btn(extras, 'embed', '[add to note]', 'Add player card to note', 'amp-small', () => player.current && api.insertEmbed('track', player.current));
   const bFav = btn(extras, 'heart', '[♥]', 'Favourite', 'amp-small', () => { const t = player.current; if (!t) return; toggleFav(t.path); });
   const volWrap = h('label', 'amp-vol', null, extras);
   volWrap.appendChild(svg('vol', 18));
@@ -155,7 +155,7 @@ function mountAmp(root, api) {
       ...playlistItems([t.path]),
       { section: true },
       ...(api.logLabel() ? [{ title: api.logLabel(), icon: 'calendar-plus', run: () => api.logTrack(t) }] : []),
-      { title: 'Copy embed', icon: 'link', run: () => api.copyEmbed('track', t) }
+      { title: 'Add player card to note', icon: 'link', run: () => api.insertEmbed('track', t) }
     ];
     api.menu(evt, items);
   }
@@ -169,7 +169,7 @@ function mountAmp(root, api) {
       { section: true },
       ...playlistItems(paths)
     ];
-    if (embedKind) items.push({ section: true }, { title: 'Copy embed', icon: 'link', run: () => api.copyEmbed(embedKind, embedRef) });
+    if (embedKind) items.push({ section: true }, { title: 'Add player card to note', icon: 'link', run: () => api.insertEmbed(embedKind, embedRef) });
     api.menu(evt, items);
   }
   function playlistItems(paths) {
@@ -378,7 +378,7 @@ function mountAmp(root, api) {
         const acts = h('div', 'amp-actions', null, browse);
         btn(acts, 'play', '[play]', 'Play', 'amp-pill', () => player.playList(tracks.map(t => t.path), 0));
         btn(acts, 'shuffle', '[shuffle]', 'Shuffle', 'amp-pill', () => player.playList(tracks.map(t => t.path), 0, { shuffle: true }));
-        btn(acts, 'embed', '[copy embed]', 'Copy embed', 'amp-pill amp-pill-icon', () => api.copyEmbed('playlist', pl));
+        btn(acts, 'embed', '[add to note]', 'Add player card to note', 'amp-pill amp-pill-icon', () => api.insertEmbed('playlist', pl));
         btn(acts, 'close', '[delete]', 'Delete playlist', 'amp-pill amp-pill-icon', () => { if (confirmDelete(pl)) { d.playlists = d.playlists.filter(x => x !== pl); api.save(); nav.stack.pop(); renderBrowse(); } });
         if (!tracks.length) h('p', 'amp-hint', 'Right-click any track, album or folder and choose "Add to ' + pl.name + '".', browse);
         trackRows(browse, tracks, { album: true, numbers: 'index', removable: i => { pl.tracks.splice(pl.tracks.indexOf(tracks[i].path), 1); api.save(); renderBrowse(); } });

@@ -94,7 +94,7 @@ class AuroraMP3Plugin extends Plugin {
       },
       logTrack: t => this.logTrack(t),
       logLabel: () => this.logLabel(),
-      copyEmbed: (kind, ref) => this.copyEmbed(kind, ref),
+      insertEmbed: (kind, ref) => this.insertEmbed(kind, ref),
       openUrl: u => window.open(u)
     };
   }
@@ -143,7 +143,7 @@ class AuroraMP3Plugin extends Plugin {
       ['repeat', 'Cycle repeat (off, all, one)', () => p.cycleRepeat()],
       ['favourite', 'Favourite / unfavourite current track', () => { const t = p.current; if (!t) return; if (this.d.favourites[t.path]) delete this.d.favourites[t.path]; else this.d.favourites[t.path] = Date.now(); this.save(); this.refreshViews(); }],
       ['log', 'Log current track', () => this.d.logTarget === 'off' ? new Notice('Aurora MP3: logging is off in settings') : p.current ? this.logTrack(p.current) : new Notice('Aurora MP3: nothing playing')],
-      ['copy-embed', 'Copy embed for current track', () => p.current && this.copyEmbed('track', p.current)],
+      ['insert-embed-card', 'Insert player card for current track into note', () => p.current && this.insertEmbed('track', p.current)],
       ['rescan', 'Rescan music library', () => this.rescan()],
       ['theme', 'Switch look (glass / terminal)', () => { this.d.theme = this.d.theme === 'terminal' ? 'glass' : 'terminal'; this.save(); this.refreshViews(); }],
       ['search', 'Search music', async () => { const leaf = await this.activateView(); if (leaf && leaf.view.ui) leaf.view.ui.focusSearch(); }]
@@ -223,9 +223,14 @@ class AuroraMP3Plugin extends Plugin {
     return lines.join('\n');
   }
 
-  async copyEmbed(kind, ref) {
-    try { await navigator.clipboard.writeText(this.embedText(kind, ref)); new Notice('Embed copied: paste it into any note'); }
-    catch (e) { new Notice('Aurora MP3: could not copy to the clipboard'); }
+  // insert the embed block at the cursor of the note you were last editing
+  insertEmbed(kind, ref) {
+    const ed = this.app.workspace.activeEditor && this.app.workspace.activeEditor.editor;
+    if (!ed) { new Notice('Aurora MP3: open a note first, then insert the embed'); return; }
+    const cur = ed.getCursor(), line = ed.getLine(cur.line);
+    const text = (line.trim() ? '\n' : '') + this.embedText(kind, ref) + '\n';
+    ed.replaceRange(text, cur);
+    new Notice('Embed added to the note');
   }
 
   resolveEmbed(src) {
