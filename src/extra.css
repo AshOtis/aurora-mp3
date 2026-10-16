@@ -1,0 +1,14 @@
+/* Obsidian host, status bar and note embeds */
+.workspace-leaf-content[data-type="aurora-mp3-view"] .view-content.amp-host { padding: 0; overflow: hidden; }
+.amp-host > .amp { height: 100%; }
+.amp-host .amp-scroll { padding-bottom: 44px; }
+.amp-status { cursor: pointer; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.amp-status.amp-hidden { display: none; }
+
+.amp-embed { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--background-modifier-border); border-radius: 10px; background: var(--background-secondary); }
+.amp-embed-art { width: 56px; height: 56px; flex: none; border-radius: 6px; overflow: hidden; background: var(--background-modifier-hover); }
+.amp-embed-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.amp-embed-info { flex: 1; min-width: 0; }
+.amp-embed-title { font-weight: 600; color: var(--text-normal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.amp-embed-sub { font-size: var(--font-ui-small); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.amp-embed-miss { color: var(--text-muted); font-size: var(--font-ui-small); }
