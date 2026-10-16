@@ -1,7 +1,7 @@
 {
-  "id": "aurora-mp3",
+  "id": "aurora-music",
   "name": "Aurora MP3",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.4.0",
   "description": "Play music from folders on your computer in a sidebar player with album covers, playlists, a queue, resume and daily note logging.",
   "author": "AshOtis",
