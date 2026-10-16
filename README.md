@@ -37,9 +37,14 @@ artist: Low Tide
 
 Also works with `track: <file path>`, `artist: <name>`, `playlist: <name>` and `folder: <path>`.
 
-## Privacy
+## Permissions and privacy
 
-Aurora MP3 makes no network requests. It reads your music folders and nothing else. The library index and cover thumbnails are stored in the plugin's own folder in your vault (`library.json` and `covers/`). Settings, playlists and favourites are in its `data.json`.
+The plugin directory flags two things about Aurora MP3. Here is what each one means:
+
+- **File system access (Node.js `fs`):** this is needed to play music stored outside your vault. Aurora MP3 uses it **read-only**. It lists the music folders you add in settings and reads the audio files in them (tags, covers and playback), plus a `cover.jpg` or `folder.jpg` beside them. It never writes, moves or deletes anything outside your vault. Its own files (`library.json`, `covers/` and `data.json`) are written through Obsidian's normal vault API, in the plugin's folder.
+- **Clipboard:** written to only when you click **Copy embed**, to put the embed block on your clipboard. Aurora MP3 never reads your clipboard.
+
+It makes no network requests and has no telemetry. Nothing leaves your computer.
 
 ## Desktop only
 
