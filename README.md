@@ -17,6 +17,8 @@ Play music from folders on your computer in an Obsidian sidebar player, with alb
 - **Two looks:**
   - **Glass:** large covers and soft glows tinted by the album art.
   - **Terminal:** calm monospace text.
+- **Static Aurora theme:** with the [Static Aurora](https://github.com/AshOtis/static-aurora) theme installed, the theme's glows take on the colours of the album cover when you press play. They stay when you pause. Turn this off in settings with **Colour the Static Aurora theme**.
+- **Takes turns:** pressing play pauses my other players (Static FM, Hi-Fi Tuner), and they pause Aurora MP3. Turn on **Play alongside other players** to mix them.
 - Media keys, now-playing in the status bar, and commands for everything. Set your own hotkeys in **Settings → Hotkeys**.
 
 ## Getting started

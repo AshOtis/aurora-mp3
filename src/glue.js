@@ -62,13 +62,55 @@ class AuroraMP3Plugin extends Plugin {
     this.addCommands();
     this.addSettingTab(new AMPSettingTab(this.app, this));
 
+    // One player at a time: tell the other AshOtis players when music starts, and pause when one of them starts
+    this.registerDomEvent(this.player.audio, 'play', () => this.app.workspace.trigger('ashotis:playing', 'aurora-mp3'));
+    this.registerEvent(this.app.workspace.on('ashotis:playing', src => {
+      if (src !== 'aurora-mp3' && this.player.playing && this.d.playTogether !== true) this.player.pause();
+    }));
+
+    // Share the album cover's colours with the Static Aurora theme while music plays
+    this.registerInterval(window.setInterval(() => this.syncTheme(), 1000));
+
     this.app.workspace.onLayoutReady(() => {
       this.player.restore();
       if (this.d.folders.length) window.setTimeout(() => this.rescan(true), 3000);
     });
   }
 
+  // Writes the theme colours only when they change (a new album), never on a timer tick:
+  // every write makes Obsidian restyle the whole window, so frequent writes made the app sluggish.
+  syncTheme() {
+    const p = this.player, t = p.current, body = document.body, vars = ['--sa-c1', '--sa-c2', '--sa-c3'];
+    if (this.d.themeSync === false || !t || !p.playing) {
+      // paused or stopped: keep the last colours on the theme; only clear when syncing is switched off
+      if (this.d.themeSync === false && this.synced) { delete body.dataset.saOwner; for (const v of vars) body.style.removeProperty(v); this.synced = false; this.syncKey = ''; }
+      return;
+    }
+    if (t.cover !== this.syncCover) {
+      this.syncCover = t.cover; this.syncCols = null;
+      amPalette(t.cover ? this.coverUrl(t.cover) : null).then(cols => { if (this.syncCover === t.cover) this.syncCols = cols; });
+    }
+    if (!this.syncCols || !this.mayColourTheme('aurora-mp3')) return;
+    const rgb = c => `rgb(${c.map(v => Math.round(v)).join(', ')})`;
+    const vals = [rgb(this.syncCols[0]), rgb(this.syncCols[1]), rgb(this.syncCols[2].map(v => v * 0.75))];
+    const key = vals.join('|');
+    if (key === this.syncKey && this.synced) return;
+    vals.forEach((v, i) => body.style.setProperty(vars[i], v));
+    this.syncKey = key; this.synced = true;
+  }
+
+  // Only one plugin colours the theme at a time: whoever started first keeps it until they stop
+  mayColourTheme(me) {
+    const o = (document.body.dataset.saOwner || '').split(':');
+    if (o[0] && o[0] !== me && Date.now() - Number(o[1]) < 3000) { this.synced = false; return false; }
+    if (o[0] !== me) this.synced = false;   // taking over from another player: repaint
+    document.body.dataset.saOwner = me + ':' + Date.now();
+    return true;
+  }
+
   onunload() {
+    if ((document.body.dataset.saOwner || '').startsWith('aurora-mp3:')) delete document.body.dataset.saOwner;
+    for (const v of ['--sa-c1', '--sa-c2', '--sa-c3']) document.body.style.removeProperty(v);
     this.player.destroy();
     clearTimeout(this.saveTimer);
     this.saveData(this.d);
@@ -293,6 +335,10 @@ class AMPSettingTab extends PluginSettingTab {
       .addDropdown(dd => dd.addOptions({ grid: 'Grid', list: 'List' }).setValue(d.albumView).onChange(v => { d.albumView = v; p.save(); p.refreshViews(); }));
     new Setting(containerEl).setName('Background motion').setDesc('Slowly drifting glows tinted by the album cover. Turn off for a still background.')
       .addToggle(t => t.setValue(d.motion).onChange(v => { d.motion = v; p.save(); }));
+    new Setting(containerEl).setName('Colour the Static Aurora theme').setDesc('While music plays, the Static Aurora theme glows in the colours of the album cover. Has no effect with other themes.')
+      .addToggle(t => t.setValue(d.themeSync !== false).onChange(v => { d.themeSync = v; p.save(); p.syncTheme(); }));
+    new Setting(containerEl).setName('Play alongside other players').setDesc('Off: starting Static FM, Hi-Fi Tuner or MFP Player pauses the music, and the other way round. On: let them play together.')
+      .addToggle(t => t.setValue(d.playTogether === true).onChange(v => { d.playTogether = v; p.save(); }));
     new Setting(containerEl).setName('Show in status bar').setDesc('The current track. Click it to play or pause.')
       .addToggle(t => t.setValue(d.statusBar).onChange(v => { d.statusBar = v; p.save(); p.updateStatus(); }));
 
