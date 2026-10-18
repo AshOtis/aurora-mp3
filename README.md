@@ -18,6 +18,7 @@ Play music from folders on your computer in an Obsidian sidebar player, with alb
   - **Glass:** large covers and soft glows tinted by the album art.
   - **Terminal:** calm monospace text.
 - **Static Aurora theme:** with the [Static Aurora](https://github.com/AshOtis/aurora-theme) theme installed, the theme's glows take on the colours of the album cover when you press play. They stay when you pause. Turn this off in settings with **Colour the Static Aurora theme**.
+- **Spotify and other apps (Windows):** turn on **Show what's playing on your computer** and, when Spotify, a browser, Apple Music, VLC or another app is playing, Aurora MP3 shows the track and its cover with play/pause, next and previous. Its album colours tint the player and the Static Aurora theme, even while the player is hidden. Press **Resume** or play your own music and Aurora MP3 takes over again. No Spotify account or setup: the track is read from Windows, the same place the volume pop-up gets it. It works without a music folder too.
 - **Takes turns:** pressing play pauses my other players (Static FM, Hi-Fi Tuner), and they pause Aurora MP3. Turn on **Play alongside other players** to mix them.
 - Media keys, now-playing in the status bar, and commands for everything. Set your own hotkeys in **Settings → Hotkeys**.
 
@@ -44,6 +45,8 @@ Also works with `track: <file path>`, `artist: <name>`, `playlist: <name>` and `
 The plugin directory flags file system access. Here is what it means:
 
 - **File system access (Node.js `fs`):** this is needed to play music stored outside your vault. Aurora MP3 uses it **read-only**. It lists the music folders you add in settings and reads the audio files in them (tags, covers and playback), plus a `cover.jpg` or `folder.jpg` beside them. It never writes, moves or deletes anything outside your vault. Its own files (`library.json`, `covers/` and `data.json`) are written through Obsidian's normal vault API, in the plugin's folder.
+
+- **Running a Windows command (Node.js `child_process`), only if you turn on "Show what's playing on your computer":** Aurora MP3 starts a small hidden Windows PowerShell process that asks Windows' media controls what is playing (title, artist, album and cover) about once a second, and sends play/pause, next and previous when you press those buttons. It runs only while the setting is on and stops when you turn it off or close Obsidian. It reads nothing else, and the information stays on your computer. The full script is in [`src/nowplaying.js`](src/nowplaying.js).
 
 It doesn't use the clipboard, makes no network requests and has no telemetry. Nothing leaves your computer.
 

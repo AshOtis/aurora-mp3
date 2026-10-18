@@ -21,6 +21,7 @@ const AM_ICONS = {
   more: '<circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/>',
   close: '<path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
   folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
+  pc: '<rect x="3" y="4" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 20h8M12 16v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
   disc: '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/>'
 };
 
@@ -76,6 +77,7 @@ function mountAmp(root, api) {
   const now = h('section', 'amp-now', null, scroll);
   const nowArt = h('div', 'amp-now-art', null, now);
   const nowInfo = h('div', 'amp-now-info', null, now);
+  const nowSrc = h('div', 'amp-src', null, nowInfo); h('i', null, null, nowSrc); const nowSrcTxt = h('span', null, '', nowSrc);
   const nowTitle = h('div', 'amp-now-title', '', nowInfo);
   const nowArtist = h('button', 'amp-now-artist amp-link', '', nowInfo);
   const nowAlbum = h('button', 'amp-now-album amp-link', '', nowInfo);
@@ -96,15 +98,23 @@ function mountAmp(root, api) {
   seek.addEventListener('change', () => { player.seek(seek.value / 1000 * player.duration); seeking = false; });
 
   const transport = h('div', 'amp-transport', null, scroll);
+  const X = () => api.ext && api.ext();   // the computer's track, when it is showing instead of yours
   const bShuffle = btn(transport, 'shuffle', '[shuffle]', 'Shuffle', 'amp-small', () => player.toggleShuffle());
-  btn(transport, 'prev', '[prev]', 'Previous', 'amp-mid', () => player.prev());
-  const bPlay = btn(transport, 'play', '[play]', 'Play', 'amp-big', () => player.toggle());
-  btn(transport, 'next', '[next]', 'Next', 'amp-mid', () => player.next());
+  btn(transport, 'prev', '[prev]', 'Previous', 'amp-mid', () => X() ? api.extControl('prev') : player.prev());
+  const bPlay = btn(transport, 'play', '[play]', 'Play', 'amp-big', () => X() ? api.extControl('toggle') : player.toggle());
+  btn(transport, 'next', '[next]', 'Next', 'amp-mid', () => X() ? api.extControl('next') : player.next());
   const bRepeat = btn(transport, 'repeat', '[repeat off]', 'Repeat', 'amp-small', () => player.cycleRepeat());
 
+  const extNote = h('div', 'amp-extnote', '', scroll);
+  const resume = h('button', 'amp-resume', null, scroll);
+  resume.appendChild(svg('disc', 16));
+  const resumeTxt = h('span', 'amp-resume-txt', '', resume);
+  h('span', 'amp-resume-go', 'Resume', resume);
+  resume.addEventListener('click', () => api.resumeOwn());
+
   const extras = h('div', 'amp-extras', null, scroll);
-  const bLog = btn(extras, 'note', '[log]', 'Log', 'amp-small', () => player.current && api.logTrack(player.current));
-  btn(extras, 'embed', '[add to note]', 'Add player card to note', 'amp-small', () => player.current && api.insertEmbed('track', player.current));
+  const bLog = btn(extras, 'note', '[log]', 'Log', 'amp-small', () => { const x = X(); if (x) api.logTrack({ title: x.title, artist: x.artist, album: x.album }); else if (player.current) api.logTrack(player.current); });
+  const bEmbed = btn(extras, 'embed', '[add to note]', 'Add player card to note', 'amp-small', () => player.current && api.insertEmbed('track', player.current));
   const bFav = btn(extras, 'heart', '[♥]', 'Favourite', 'amp-small', () => { const t = player.current; if (!t) return; toggleFav(t.path); });
   const volWrap = h('label', 'amp-vol', null, extras);
   volWrap.appendChild(svg('vol', 18));
@@ -281,6 +291,7 @@ function mountAmp(root, api) {
       const empty = h('div', 'amp-empty', null, browse);
       h('div', 'amp-empty-title', 'Add your music folder', empty);
       h('p', null, 'Point Aurora MP3 at a folder of music on this computer, for example your Music folder. It scans the subfolders and reads tags and covers. Nothing leaves your computer.', empty);
+      if (api.systemNowOn && api.systemNowOn()) h('p', null, 'Spotify and other apps playing on this computer show above, and colour the theme, even without a music folder.', empty);
       btn(empty, null, 'Open settings', 'Open settings', 'amp-pill amp-pill-accent', () => api.openSettings());
       return;
     }
@@ -444,7 +455,12 @@ function mountAmp(root, api) {
     if (logLbl) { bLog.title = logLbl; bLog.setAttribute('aria-label', logLbl); bLog.querySelector('.amp-lbl').textContent = '[' + logLbl.toLowerCase() + ']'; }
     root.classList.toggle('amp-glass', d.theme !== 'terminal');
     root.classList.toggle('amp-term', d.theme === 'terminal');
-    root.classList.toggle('is-playing', player.playing);
+    const x = X();
+    root.classList.toggle('is-ext', !!x);
+    root.classList.toggle('is-playing', x ? x.playing : player.playing);
+    nowSrc.hidden = !x; extNote.hidden = !x;
+    if (x) return paintExt(x);
+    resume.hidden = true;
     const t = player.current;
     if (t && t.cover !== lastCover) {
       lastCover = t.cover; nowArt.textContent = '';
@@ -488,15 +504,47 @@ function mountAmp(root, api) {
     markCurrent();
   }
 
+  // Spotify (or another app on the computer) is leading: show its track, cover and simple controls
+  function paintExt(x) {
+    const key = 'ext:' + x.app + '|' + x.album + '|' + x.title + '|' + (x.art ? x.art.length : 0);
+    if (key !== lastCover) {
+      lastCover = key; nowArt.textContent = '';
+      const wrap = h('div', 'amp-art amp-art-lg', null, nowArt);
+      if (x.art) { const im = h('img', null, null, wrap); im.alt = ''; im.draggable = false; im.src = x.art; }
+      else { wrap.classList.add('is-empty'); wrap.appendChild(svg('disc', 22)); }
+      amPalette(x.art || null).then(cols => { colours = cols; });
+    }
+    nowSrcTxt.textContent = (x.playing ? 'Playing on ' : 'Paused on ') + x.appName;
+    nowSrc.classList.toggle('is-paused', !x.playing);
+    nowTitle.textContent = x.title;
+    nowArtist.textContent = x.artist; nowAlbum.textContent = x.album;
+    nowArtist.disabled = true; nowAlbum.disabled = true;
+    nowMeta.textContent = 'From your computer'; nowMeta.classList.remove('is-err');
+    bPlay.replaceChild(svg(x.playing ? 'pause' : 'play', 24), bPlay.querySelector('.amp-ico'));
+    bPlay.querySelector('.amp-lbl').textContent = x.playing ? '[pause]' : '[play]';
+    const lbl = (x.playing ? 'Pause ' : 'Play ') + x.appName;
+    bPlay.setAttribute('aria-label', lbl); bPlay.title = lbl;
+    extNote.textContent = 'Controls ' + x.appName + ' · volume is set in ' + x.appName;
+    const t = player.current;
+    resume.hidden = !t;
+    if (t) resumeTxt.textContent = 'Your music: ' + t.title + (player.time > 1 ? ' · paused at ' + fmt(player.time) : '');
+    const logLbl = api.logLabel();
+    bLog.hidden = !logLbl;
+    const st = library.scanning ? `Scanning ${library.progress.done}/${library.progress.total}` : (d.queue.length ? 'Queue · ' + d.queue.length : '');
+    sub.textContent = st;
+    markCurrent();
+  }
+
   let colours = [[90, 120, 170], [200, 130, 90], [60, 80, 110]], level = 0, lastPaint = 0;
   function loop(ts) {
     if (stopped) return;
     raf = requestAnimationFrame(loop);
     if (document.hidden || ts - lastPaint < 100) return;
     lastPaint = ts;
-    level += (player.meter() - level) * 0.3;
+    const x = X();
+    level += ((x ? (x.playing ? 0.35 : 0) : player.meter()) - level) * 0.3;
     aurora.setStill(!d.motion || d.theme === 'terminal' || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches));
-    aurora.update({ cols: colours, playing: player.playing, pulsing: false, pulsePeriod: 16, level });
+    aurora.update({ cols: colours, playing: x ? x.playing : player.playing, pulsing: false, pulsePeriod: 16, level });
   }
 
   const offPlayer = player.on(() => { if (!stopped) paintNow(); });
@@ -506,6 +554,7 @@ function mountAmp(root, api) {
 
   return {
     refresh() { lastCover = undefined; paintNow(); renderBrowse(); },
+    paint() { if (!stopped) paintNow(); },
     focusSearch() { search.focus(); },
     destroy() { stopped = true; offPlayer(); offLib(); cancelAnimationFrame(raf); aurora.stop(); }
   };

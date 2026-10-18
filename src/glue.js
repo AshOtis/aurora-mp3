@@ -8,7 +8,7 @@ const AMP_DEFAULTS = {
   volume: 0.8, shuffle: false, repeat: 'off', queue: [], originalQueue: [], index: 0, last: null, lastTime: 0,
   positions: {}, favourites: {}, playlists: [], tab: 'albums',
   logFormat: '- {{time}} ♪ {{title}} — {{artist}} ({{album}})',
-  logTarget: 'daily', logNote: 'Music log.md', autoLog: false
+  logTarget: 'daily', logNote: 'Music log.md', autoLog: false, systemNow: false
 };
 
 class AMPView extends ItemView {
@@ -55,7 +55,7 @@ class AuroraMP3Plugin extends Plugin {
 
     this.statusEl = this.addStatusBarItem();
     this.statusEl.addClass('amp-status');
-    this.registerDomEvent(this.statusEl, 'click', () => this.player.toggle());
+    this.registerDomEvent(this.statusEl, 'click', () => this.extShown() ? this.sysNow.control('toggle') : this.player.toggle());
     this.updateStatus();
 
     this.registerMarkdownCodeBlockProcessor('aurora-mp3', (src, el) => this.renderEmbed(src, el));
@@ -66,8 +66,20 @@ class AuroraMP3Plugin extends Plugin {
     this.registerDomEvent(this.player.audio, 'play', () => this.app.workspace.trigger('ashotis:playing', 'aurora-mp3'));
     for (const ev of ['pause', 'ended']) this.registerDomEvent(this.player.audio, ev, () => this.app.workspace.trigger('ashotis:stopped', 'aurora-mp3'));
     this.registerEvent(this.app.workspace.on('ashotis:playing', src => {
-      if (src !== 'aurora-mp3' && this.player.playing && this.d.playTogether !== true) this.player.pause();
+      if (src === 'aurora-mp3' || this.d.playTogether === true) return;
+      if (this.player.playing) this.player.pause();
+      if (this.ext && this.ext.playing) this.sysNow.control('pause');
     }));
+    // your own music starting pauses Spotify (or whatever else is playing on the computer)
+    this.registerDomEvent(this.player.audio, 'play', () => {
+      this.extLed = false;
+      if (this.ext && this.ext.playing && this.d.playTogether !== true) this.sysNow.control('pause');
+    });
+
+    // What's playing on your computer (Spotify and friends), read from Windows
+    this.ext = null; this.extLed = false;
+    this.sysNow = new AMSystemNow(st => this.onExt(st));
+    if (this.d.systemNow) this.app.workspace.onLayoutReady(() => this.sysNow.start());
 
     // Share the album cover's colours with the Static Aurora theme while music plays
     this.registerInterval(window.setInterval(() => this.syncTheme(), 1000));
@@ -78,18 +90,48 @@ class AuroraMP3Plugin extends Plugin {
     });
   }
 
+  setSystemNow(on) {
+    this.d.systemNow = on; this.save();
+    if (on) this.sysNow.start(); else { this.sysNow.stop(); this.extLed = false; }
+    this.refreshViews();
+  }
+
+  // Spotify (or another app) changed track or started/paused
+  onExt(st) {
+    const was = this.ext;
+    this.ext = st;
+    if (st && st.playing && !(was && was.playing)) {
+      this.extLed = true;                                             // it leads until your own music plays again
+      this.app.workspace.trigger('ashotis:playing', 'aurora-mp3');      // the other players step aside
+      if (this.player.playing && this.d.playTogether !== true) this.player.pause();
+    }
+    if (was && was.playing && !(st && st.playing) && this.extShown()) this.app.workspace.trigger('ashotis:stopped', 'aurora-mp3');
+    if (!st) this.extLed = false;
+    this.syncTheme(); this.updateStatus();
+    for (const leaf of this.app.workspace.getLeavesOfType(AMP_VIEW)) if (leaf.view && leaf.view.ui && leaf.view.ui.paint) leaf.view.ui.paint();
+  }
+
+  // show the computer's track instead of yours: it is playing (or you paused it here) and your music isn't playing
+  extShown() { return !!(this.d.systemNow && this.ext && this.extLed && !this.player.playing); }
+
+  // Resume your own music: pause the other app, then play
+  resumeOwn() { if (this.ext && this.ext.playing) this.sysNow.control('pause'); this.extLed = false; this.player.toggle(); }
+
   // Writes the theme colours only when they change (a new album), never on a timer tick:
   // every write makes Obsidian restyle the whole window, so frequent writes made the app sluggish.
   syncTheme() {
-    const p = this.player, t = p.current, body = document.body, vars = ['--sa-c1', '--sa-c2', '--sa-c3'];
-    if (this.d.themeSync === false || !t || !p.playing) {
+    const p = this.player, body = document.body, vars = ['--sa-c1', '--sa-c2', '--sa-c3'];
+    const ext = this.extShown() ? this.ext : null;
+    const t = ext ? { cover: 'ext:' + ext.app + '|' + ext.album + '|' + ext.title, art: ext.art } : p.current;
+    if (this.d.themeSync === false || !t || !(ext ? ext.playing : p.playing)) {
       // paused or stopped: keep the last colours on the theme; only clear when syncing is switched off
       if (this.d.themeSync === false && this.synced) { delete body.dataset.saOwner; for (const v of vars) body.style.removeProperty(v); this.synced = false; this.syncKey = ''; }
       return;
     }
     if (t.cover !== this.syncCover) {
       this.syncCover = t.cover; this.syncCols = null;
-      amPalette(t.cover ? this.coverUrl(t.cover) : null).then(cols => { if (this.syncCover === t.cover) this.syncCols = cols; });
+      const url = t.art !== undefined ? (t.art || null) : (t.cover ? this.coverUrl(t.cover) : null);
+      amPalette(url).then(cols => { if (this.syncCover === t.cover) this.syncCols = cols; });
     }
     if (!this.syncCols || !this.mayColourTheme('aurora-mp3')) return;
     const rgb = c => `rgb(${c.map(v => Math.round(v)).join(', ')})`;
@@ -110,6 +152,7 @@ class AuroraMP3Plugin extends Plugin {
   }
 
   onunload() {
+    if (this.sysNow) this.sysNow.stop();
     if ((document.body.dataset.saOwner || '').startsWith('aurora-mp3:')) delete document.body.dataset.saOwner;
     for (const v of ['--sa-c1', '--sa-c2', '--sa-c3']) document.body.style.removeProperty(v);
     this.player.destroy();
@@ -138,7 +181,11 @@ class AuroraMP3Plugin extends Plugin {
       logTrack: t => this.logTrack(t),
       logLabel: () => this.logLabel(),
       insertEmbed: (kind, ref) => this.insertEmbed(kind, ref),
-      openUrl: u => window.open(u)
+      openUrl: u => window.open(u),
+      ext: () => (this.extShown() ? this.ext : null),
+      extControl: a => this.sysNow.control(a),
+      resumeOwn: () => this.resumeOwn(),
+      systemNowOn: () => !!this.d.systemNow
     };
   }
 
@@ -167,6 +214,13 @@ class AuroraMP3Plugin extends Plugin {
 
   updateStatus() {
     if (!this.statusEl) return;
+    if (this.extShown()) {
+      const x = this.ext;
+      this.statusEl.toggleClass('amp-hidden', !this.d.statusBar);
+      this.statusEl.setText(`${x.playing ? '♪' : '❚❚'} ${x.title}${x.artist ? ' — ' + x.artist : ''}`);
+      this.statusEl.setAttribute('aria-label', `Aurora MP3: playing on ${x.appName}. Click to ${x.playing ? 'pause' : 'play'}`);
+      return;
+    }
     const t = this.player.current;
     const show = this.d.statusBar && t && (this.player.playing || this.player.time > 0);
     this.statusEl.toggleClass('amp-hidden', !show);
@@ -179,9 +233,9 @@ class AuroraMP3Plugin extends Plugin {
     const p = this.player;
     const cmds = [
       ['open', 'Open player', () => this.activateView()],
-      ['toggle', 'Play / pause', () => p.toggle()],
-      ['next', 'Next track', () => p.next()],
-      ['previous', 'Previous track', () => p.prev()],
+      ['toggle', 'Play / pause', () => this.extShown() ? this.sysNow.control('toggle') : p.toggle()],
+      ['next', 'Next track', () => this.extShown() ? this.sysNow.control('next') : p.next()],
+      ['previous', 'Previous track', () => this.extShown() ? this.sysNow.control('prev') : p.prev()],
       ['shuffle', 'Shuffle on / off', () => p.toggleShuffle()],
       ['repeat', 'Cycle repeat (off, all, one)', () => p.cycleRepeat()],
       ['favourite', 'Favourite / unfavourite current track', () => { const t = p.current; if (!t) return; if (this.d.favourites[t.path]) delete this.d.favourites[t.path]; else this.d.favourites[t.path] = Date.now(); this.save(); this.refreshViews(); }],
@@ -338,6 +392,11 @@ class AMPSettingTab extends PluginSettingTab {
       .addToggle(t => t.setValue(d.motion).onChange(v => { d.motion = v; p.save(); }));
     new Setting(containerEl).setName('Colour the Static Aurora theme').setDesc('While music plays, the Static Aurora theme glows in the colours of the album cover. Has no effect with other themes.')
       .addToggle(t => t.setValue(d.themeSync !== false).onChange(v => { d.themeSync = v; p.save(); p.syncTheme(); }));
+    new Setting(containerEl).setName("Show what's playing on your computer")
+      .setDesc(AMSystemNow.supported()
+        ? 'When Spotify, a browser, Apple Music, VLC or another app is playing, show the track and its cover here, with play, pause, next and previous, and let its album colours tint the Static Aurora theme. Read from Windows; no account needed. Your own music takes over again when you press play.'
+        : 'Windows only for now.')
+      .addToggle(t => t.setValue(!!d.systemNow).setDisabled(!AMSystemNow.supported()).onChange(v => p.setSystemNow(v)));
     new Setting(containerEl).setName('Play alongside other players').setDesc('Off: starting Static FM, Hi-Fi Tuner or MFP Player pauses the music, and the other way round. On: let them play together.')
       .addToggle(t => t.setValue(d.playTogether === true).onChange(v => { d.playTogether = v; p.save(); }));
     new Setting(containerEl).setName('Show in status bar').setDesc('The current track. Click it to play or pause.')
