@@ -64,6 +64,7 @@ class AuroraMP3Plugin extends Plugin {
 
     // One player at a time: tell the other AshOtis players when music starts, and pause when one of them starts
     this.registerDomEvent(this.player.audio, 'play', () => this.app.workspace.trigger('ashotis:playing', 'aurora-mp3'));
+    for (const ev of ['pause', 'ended']) this.registerDomEvent(this.player.audio, ev, () => this.app.workspace.trigger('ashotis:stopped', 'aurora-mp3'));
     this.registerEvent(this.app.workspace.on('ashotis:playing', src => {
       if (src !== 'aurora-mp3' && this.player.playing && this.d.playTogether !== true) this.player.pause();
     }));
