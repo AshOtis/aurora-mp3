@@ -183,7 +183,12 @@ function mountAmp(root, api) {
     api.menu(evt, items);
   }
   function playlistItems(paths) {
-    const items = d.playlists.map(pl => ({ title: 'Add to ' + pl.name, icon: 'list-music', run: () => { pl.tracks.push(...paths.filter(p => !pl.tracks.includes(p))); api.save(); renderBrowse(); } }));
+    // a playlist that already has every one of these tracks offers "Remove from" instead of "Add to"
+    const items = d.playlists.map(pl => {
+      const missing = paths.filter(p => !pl.tracks.includes(p));
+      if (!missing.length && paths.length) return { title: 'Remove from ' + pl.name, icon: 'list-minus', run: () => { pl.tracks = pl.tracks.filter(p => !paths.includes(p)); api.save(); renderBrowse(); } };
+      return { title: 'Add to ' + pl.name, icon: 'list-music', run: () => { pl.tracks.push(...missing); api.save(); renderBrowse(); } };
+    });
     items.push({ title: 'New playlist with ' + (paths.length === 1 ? 'this track' : 'these tracks'), icon: 'plus', run: () => newPlaylist(paths) });
     return items;
   }
@@ -425,7 +430,7 @@ function mountAmp(root, api) {
       if (q.length) btn(acts, null, '[save as playlist]', 'Save as playlist', 'amp-pill', () => newPlaylist(d.queue.slice()));
       if (q.length) btn(acts, null, '[clear]', 'Clear queue', 'amp-pill', () => { player.unload(); d.queue = []; d.index = 0; api.save(); renderBrowse(); paintNow(); });
       if (!q.length) h('p', 'amp-hint', 'Nothing queued. Play an album, artist or folder, or right-click and choose "Add to queue".', browse);
-      const ol = trackRows(browse, q, { album: true, numbers: 'index', onPlay: i => player.jump(i), removable: i => player.removeAt(i), onMenu: (e, t) => trackMenu(e, t) });
+      const ol = trackRows(browse, q, { album: true, numbers: 'index', onPlay: i => player.jump(i), removable: i => { player.removeAt(i); renderBrowse(); }, onMenu: (e, t) => trackMenu(e, t) });
       [...ol.children].forEach((li, i) => { li.dataset.qi = i; });
       const cur = ol.children[d.index]; if (cur) setTimeout(() => cur.scrollIntoView({ block: 'nearest' }), 0);
     }
