@@ -64,4 +64,4 @@ If you enjoy it, you can [buy me a coffee](https://buymeacoffee.com/ashotis). Fo
 
 ## License
 
-[MIT](LICENSE) © AshOtis
+[PolyForm Noncommercial 1.0.0](LICENSE) © AshOtis: free for personal and other noncommercial use; selling it or using it commercially needs my permission. Versions before this change were released under MIT.
