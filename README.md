@@ -64,4 +64,8 @@ If you enjoy it, you can [buy me a coffee](https://buymeacoffee.com/ashotis). Fo
 
 ## License
 
+<<<<<<< HEAD
 [GNU AGPL v3 or later](LICENSE) © AshOtis
+=======
+[GNU AGPL v3 or later](LICENSE)  © AshOtis: free for personal and other noncommercial use; selling it or using it commercially needs my permission. Versions before this change were released under MIT.
+>>>>>>> 5ff5e8b78f9676a241379d63b98dfb528f571326
