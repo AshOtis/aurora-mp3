@@ -34,6 +34,16 @@ class AuroraMP3Plugin extends Plugin {
     const dir = this.manifest.dir, adapter = this.app.vault.adapter;
     const coverPath = n => `${dir}/covers/${n}`;
     this.coverUrl = n => adapter.getResourcePath(coverPath(n));
+    // For reading a cover's colours: its bytes as a blob: address. Obsidian treats the app:// address of a
+    // file as another site, so the page may not read that image's pixels (the colours then stayed on the
+    // defaults). A blob made here can always be read. Falls back to the normal address.
+    this.paletteUrl = async n => {
+      if (!n) return null;
+      try {
+        const b = await adapter.readBinary(coverPath(n));
+        return URL.createObjectURL(new Blob([b], { type: /\.png$/i.test(n) ? 'image/png' : 'image/jpeg' }));
+      } catch (e) { return this.coverUrl(n); }
+    };
 
     this.library = new AMLibrary({
       fs, path,
@@ -130,8 +140,9 @@ class AuroraMP3Plugin extends Plugin {
     }
     if (t.cover !== this.syncCover) {
       this.syncCover = t.cover; this.syncCols = null;
-      const url = t.art !== undefined ? (t.art || null) : (t.cover ? this.coverUrl(t.cover) : null);
-      amPalette(url).then(cols => { if (this.syncCover === t.cover) this.syncCols = cols; });
+      const want = t.cover;
+      (t.art !== undefined ? Promise.resolve(t.art || null) : this.paletteUrl(t.cover))
+        .then(url => amPalette(url).then(cols => { if (this.syncCover === want) this.syncCols = cols; if (url && url.startsWith('blob:')) URL.revokeObjectURL(url); }));
     }
     if (!this.syncCols || !this.mayColourTheme('aurora-mp3')) return;
     const rgb = c => `rgb(${c.map(v => Math.round(v)).join(', ')})`;
@@ -167,6 +178,7 @@ class AuroraMP3Plugin extends Plugin {
       player: this.player, library: this.library, data: this.d,
       save: () => this.save(),
       coverUrl: this.coverUrl,
+      paletteUrl: this.paletteUrl,
       roots: () => this.d.folders,
       openSettings: () => { this.app.setting.open(); this.app.setting.openTabById(this.manifest.id); },
       rescan: () => this.rescan(),

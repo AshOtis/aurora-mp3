@@ -470,7 +470,9 @@ function mountAmp(root, api) {
     if (t && t.cover !== lastCover) {
       lastCover = t.cover; nowArt.textContent = '';
       coverImg(t.cover, 'amp-art-lg', nowArt, t.album);
-      amPalette(t.cover ? api.coverUrl(t.cover) : null).then(cols => { colours = cols; });
+      const want = t.cover;
+      (api.paletteUrl ? api.paletteUrl(want) : Promise.resolve(want ? api.coverUrl(want) : null))
+        .then(u => amPalette(u).then(cols => { if (lastCover === want) colours = cols; if (u && u.startsWith('blob:')) URL.revokeObjectURL(u); }));
     } else if (!t && lastCover !== null) { lastCover = null; nowArt.textContent = ''; coverImg(null, 'amp-art-lg', nowArt); }
     nowTitle.textContent = t ? t.title : 'Nothing playing';
     nowArtist.textContent = t ? (t.artist || t.albumArtist || 'Unknown artist') : (library.tracks.size ? 'Pick an album below' : '');
