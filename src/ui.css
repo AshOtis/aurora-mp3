@@ -142,9 +142,9 @@
 .amp-tdur { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; flex: none; }
 .amp .amp-tx { width: 26px; height: 26px; border-radius: 50%; color: var(--dim); }
 
-.amp-backbar { display: flex; align-items: center; gap: 4px; }
+.amp-backbar { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
 .amp-backbar .amp-btn { width: 30px; height: 30px; border-radius: 50%; }
-.amp-backlbl { font-size: 12px; color: var(--dim); }
+.amp-backlbl { font-size: 12px; color: var(--dim); margin-left: -2px; }
 .amp-detail { display: flex; gap: 12px; align-items: center; padding: 0 2px; }
 .amp-detail-info { min-width: 0; }
 .amp-detail-title { font-size: 17px; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
@@ -159,7 +159,7 @@
 .amp-term .amp-txt { display: none; }
 .amp-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; font-size: 12px; padding: 0 2px; }
 .amp-crumb-sep { color: var(--dim); }
-.amp-backbar .amp-plname-input { flex: 1; min-width: 0; margin-left: 10px; font-size: 14px; font-weight: 600; height: 30px; }
+.amp-backbar input.amp-input.amp-plname-input { flex: 1; min-width: 0; margin-left: 14px; font-size: 14px; font-weight: 600; height: 30px; }
 .amp .amp-more { align-self: center; font-size: 12px; padding: 6px; }
 .amp-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px; border-radius: 14px; background: var(--glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: var(--soft); }
 .amp-empty-title { font-size: 15px; font-weight: 600; color: var(--ink); }
