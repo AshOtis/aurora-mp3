@@ -391,6 +391,31 @@ class AMPSettingTab extends PluginSettingTab {
         p.library.folderTree = null; p.save(); this.display();
         p.rescan();
       }));
+    // second way: pick a folder of the current vault; its full path on this computer is added
+    // every folder in the vault, subfolders included, as a path relative to the vault root
+    const vaultTops = [];
+    const walkVault = (folder, prefix) => { for (const c of folder.children) if (Array.isArray(c.children)) { const rel = prefix + c.name; vaultTops.push(rel); walkVault(c, rel + '/'); } };
+    walkVault(p.app.vault.getRoot(), '');
+    vaultTops.sort();
+    let pickedVault = vaultTops[0] || '';
+    new Setting(containerEl).setName('Add a folder from this vault')
+      .setDesc('Choose a folder in the current vault, subfolders included. Its full path on this computer is added.')
+      .addDropdown(dd => {
+        if (!vaultTops.length) dd.addOption('', 'No folders in this vault');
+        for (const n of vaultTops) dd.addOption(n, n);
+        dd.setValue(pickedVault).onChange(v => { pickedVault = v; });
+      })
+      .addButton(b => b.setButtonText('Add').setCta().onClick(async () => {
+        if (!pickedVault) return;
+        const base = p.app.vault.adapter.getBasePath ? p.app.vault.adapter.getBasePath() : '';
+        if (!base) { new Notice('Aurora MP3: this vault is not on disk'); return; }
+        const full = p.path.join(base, pickedVault);
+        let ok = false; try { ok = (await p.fs.promises.stat(full)).isDirectory(); } catch (e) { ok = false; }
+        if (!ok) { new Notice('That folder was not found'); return; }
+        if (!d.folders.includes(full)) d.folders.push(full);
+        p.library.folderTree = null; p.save(); this.display();
+        p.rescan();
+      }));
     new Setting(containerEl).setName('Rescan library')
       .setDesc(p.library.tracks.size ? `${p.library.tracks.size} tracks, ${p.library.albums.length} albums. Unchanged files are skipped, so rescans are quick.` : 'Not scanned yet.')
       .addButton(b => b.setButtonText(p.library.scanning ? 'Scanning…' : 'Rescan').onClick(async () => { b.setDisabled(true); await p.rescan(); this.display(); }));

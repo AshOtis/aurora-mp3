@@ -9,6 +9,7 @@ const AM_ICONS = {
   prev: '<path d="M6 6h2v12H6zM20 6v12L9 12z" fill="currentColor"/>',
   next: '<path d="M16 6h2v12h-2zM4 6v12l11-6z" fill="currentColor"/>',
   shuffle: '<path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  linear: '<path d="M3 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   repeat: '<path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   note: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M12 12v6M9 15h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   embed: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -180,6 +181,7 @@ function mountAmp(root, api) {
       ...playlistItems(paths)
     ];
     if (embedKind) items.push({ section: true }, { title: 'Add player card to note', icon: 'link', run: () => api.insertEmbed(embedKind, embedRef) });
+    if (embedKind === 'playlist') items.push({ section: true }, { title: 'Delete playlist', icon: 'close', run: () => { if (confirmDelete(embedRef)) { d.playlists = d.playlists.filter(x => x !== embedRef); api.save(); renderBrowse(); } } });
     api.menu(evt, items);
   }
   function playlistItems(paths) {
@@ -383,19 +385,12 @@ function mountAmp(root, api) {
     } else if (nav.tab === 'playlists') {
       if (top && top.kind === 'playlist') {
         const pl = d.playlists.find(x => x.id === top.id); if (!pl) { nav.stack.pop(); return renderBrowse(); }
-        backBar('Playlists');
+        const bar = backBar('Playlists');
         const tracks = pl.id === 'favourites' ? [] : pl.tracks.map(p => library.tracks.get(p)).filter(Boolean);
-        const nameRow = h('div', 'amp-plname', null, browse);
-        const name = h('input', 'amp-input amp-plname-input', null, nameRow);
+        const name = h('input', 'amp-input amp-plname-input', null, bar);
         name.value = pl.name; name.setAttribute('aria-label', 'Playlist name');
         name.addEventListener('change', () => { pl.name = name.value.trim() || pl.name; api.save(); });
         if (top.rename) { setTimeout(() => { name.focus(); name.select(); }, 30); top.rename = false; }
-        h('div', 'amp-detail-meta', plural(tracks.length, 'track') + ' · ' + fmt(tracks.reduce((s, t) => s + (t.duration || 0), 0)), browse);
-        const acts = h('div', 'amp-actions', null, browse);
-        btn(acts, 'play', '[play]', 'Play', 'amp-pill', () => player.playList(tracks.map(t => t.path), 0));
-        btn(acts, 'shuffle', '[shuffle]', 'Shuffle', 'amp-pill', () => player.playList(tracks.map(t => t.path), 0, { shuffle: true }));
-        btn(acts, 'embed', '[add to note]', 'Add player card to note', 'amp-pill amp-pill-icon', () => api.insertEmbed('playlist', pl));
-        btn(acts, 'close', '[delete]', 'Delete playlist', 'amp-pill amp-pill-icon', () => { if (confirmDelete(pl)) { d.playlists = d.playlists.filter(x => x !== pl); api.save(); nav.stack.pop(); renderBrowse(); } });
         if (!tracks.length) h('p', 'amp-hint', 'Right-click any track, album or folder and choose "Add to ' + pl.name + '".', browse);
         trackRows(browse, tracks, { album: true, numbers: 'index', removable: i => { pl.tracks.splice(pl.tracks.indexOf(tracks[i].path), 1); api.save(); renderBrowse(); } });
       } else {
@@ -410,7 +405,7 @@ function mountAmp(root, api) {
           r.addEventListener('click', onClick); if (onMenu) r.addEventListener('contextmenu', onMenu);
         };
         row('Favourites', plural(favTracks.length, 'track'), () => { nav.stack = [{ kind: 'favs' }]; renderBrowse(); }, e => listMenu(e, 'Favourites', favTracks.map(t => t.path)), 'heartOn');
-        for (const pl of d.playlists) row(pl.name, plural(pl.tracks.length, 'track'), () => { nav.stack = [{ kind: 'playlist', id: pl.id }]; renderBrowse(); }, e => listMenu(e, pl.name, pl.tracks, 'playlist', pl), 'list');
+        for (const pl of d.playlists) row(pl.name, plural(pl.tracks.filter(p => library.tracks.get(p)).length, 'track'), () => { nav.stack = [{ kind: 'playlist', id: pl.id }]; renderBrowse(); }, e => listMenu(e, pl.name, pl.tracks, 'playlist', pl), 'list');
       }
       if (top && top.kind === 'favs') {
         browse.textContent = '';
@@ -453,7 +448,7 @@ function mountAmp(root, api) {
   }
 
   /* ---------- painting ---------- */
-  let lastCover = undefined, lastFav = null;
+  let lastCover = undefined, lastFav = null, lastShuffle = null;
   function paintNow() {
     const logLbl = api.logLabel();
     bLog.hidden = !logLbl;
@@ -486,7 +481,10 @@ function mountAmp(root, api) {
     bPlay.querySelector('.amp-lbl').textContent = player.playing ? '[pause]' : '[play]';
     bPlay.setAttribute('aria-label', player.playing ? 'Pause' : 'Play'); bPlay.title = bPlay.getAttribute('aria-label');
     bShuffle.classList.toggle('is-on', !!d.shuffle); bShuffle.setAttribute('aria-pressed', !!d.shuffle);
-    bShuffle.querySelector('.amp-lbl').textContent = d.shuffle ? '[shuffle on]' : '[shuffle]';
+    bShuffle.querySelector('.amp-lbl').textContent = d.shuffle ? '[shuffle on]' : '[in order]';
+    if (d.shuffle !== lastShuffle) { lastShuffle = d.shuffle; bShuffle.replaceChild(svg(d.shuffle ? 'shuffle' : 'linear', 18), bShuffle.querySelector('.amp-ico')); }
+    bShuffle.title = d.shuffle ? 'Shuffle on: tracks after this one play in random order' : 'Shuffle off: playing in order';
+    bShuffle.setAttribute('aria-label', bShuffle.title);
     bRepeat.classList.toggle('is-on', d.repeat !== 'off');
     bRepeat.classList.toggle('is-one', d.repeat === 'one');
     bRepeat.querySelector('.amp-lbl').textContent = '[repeat ' + d.repeat + ']';

@@ -36,8 +36,8 @@ class AMPlayer {
     this.d.originalQueue = paths.slice();
     let q = paths.slice(), idx = Math.max(0, Math.min(start, q.length - 1));
     if (this.d.shuffle || opts.shuffle) {
-      if (opts.shuffle) this.d.shuffle = true;
-      const first = opts.shuffle && opts.randomStart !== false ? q[Math.floor(Math.random() * q.length)] : q[idx];
+      // the chosen track plays first and the rest follow in a shuffled order
+      const first = q[idx];
       q = amShuffled(q.filter(p => p !== first)); q.unshift(first); idx = 0;
     }
     this.d.queue = q; this.d.index = idx;
@@ -82,10 +82,16 @@ class AMPlayer {
   }
 
   toggleShuffle() {
+    // the current track and what has already played stay where they are; only the tracks after it are reordered
     this.d.shuffle = !this.d.shuffle;
-    const cur = this.d.queue[this.d.index];
-    if (this.d.shuffle) { const rest = this.d.queue.filter(p => p !== cur); this.d.queue = cur ? [cur, ...amShuffled(rest)] : amShuffled(rest); this.d.index = 0; }
-    else if (this.d.originalQueue && this.d.originalQueue.length) { this.d.queue = this.d.originalQueue.filter(p => this.track(p)); this.d.index = Math.max(0, this.d.queue.indexOf(cur)); }
+    const q = this.d.queue, i = this.d.index;
+    const played = q.slice(0, i + 1), rest = q.slice(i + 1);
+    if (this.d.shuffle) this.d.queue = [...played, ...amShuffled(rest)];
+    else {
+      const orig = this.d.originalQueue || [];
+      const pos = p => { const k = orig.indexOf(p); return k < 0 ? Infinity : k; };
+      this.d.queue = [...played, ...rest.slice().sort((a, b) => (pos(a) < pos(b) ? -1 : pos(a) > pos(b) ? 1 : 0))];
+    }
     this.save(); this.emit();
   }
 
